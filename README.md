@@ -1,10 +1,10 @@
 # static-html-comments
 
-版本 0.2.2 · MIT
+版本 0.2.3 · MIT
 
 给**本机静态 HTML** 用的点击批注：在页面上点一个元素、写一句话，这句话连同它指的元素存进项目里的一个文件；Agent 读文件改稿，用一条命令写回回复，页面上那条变灰并显示回复。
 
-![示例页上的批注模式](docs/screenshot.png)
+![点元素写批注，Agent 用命令回写回复，页面上那条变灰并显示回复](docs/demo.gif)
 
 它只占一小格，这一格的四个条件同时成立时才值得用它：
 
@@ -33,16 +33,44 @@
 
 ## 安装
 
-它是一个文件夹，不需要安装步骤。两种用法：
+它是一个文件夹，不需要安装步骤，也不需要 `npm install`；只要 Node 16 以上。
 
-- **直接用**：克隆或下载这个仓库，在里面运行下面的命令。
-- **当技能装**：把整个文件夹放进你的 Agent 的技能目录，Agent 会按 [SKILL.md](SKILL.md) 在合适的时候启用它。以 Claude Code 为例：
+**直接用**：克隆或下载这个仓库（或从 [Releases](https://github.com/rxdage/static-html-comments/releases) 下载压缩包），在里面运行下面的命令。
 
-  ```
-  git clone https://github.com/rxdage/static-html-comments ~/.claude/skills/static-html-comments
-  ```
+**当技能装**：把整个文件夹放进你的 Agent 的技能目录，Agent 会按 [SKILL.md](SKILL.md) 在合适的时候启用它。它是技能（skill），不是插件（plugin）。
 
-需要 Node 16 以上，没有别的依赖，也不需要 `npm install`。
+DeepSeek Harness（DSH），全局：
+
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force "$HOME\.dsh\skills" | Out-Null
+git clone https://github.com/rxdage/static-html-comments "$HOME\.dsh\skills\static-html-comments"
+```
+
+```bash
+# macOS / Linux
+git clone https://github.com/rxdage/static-html-comments ~/.dsh/skills/static-html-comments
+```
+
+DSH，只给某个项目用（在项目根目录执行）：
+
+```bash
+git clone https://github.com/rxdage/static-html-comments .dsh/skills/static-html-comments
+```
+
+Claude Code：
+
+```bash
+git clone https://github.com/rxdage/static-html-comments ~/.claude/skills/static-html-comments
+```
+
+装 DSH 时注意三点：
+
+- DSH 是按目录扫描发现技能的，`dsh plugin add` 装不了它。
+- `SKILL.md` 必须在技能目录的第一层：`.dsh/skills/static-html-comments/SKILL.md`。解压压缩包时别多套一层文件夹，DSH 不会往更深处找。
+- DSH 也会扫描 `.agents/skills`（项目里和用户目录下各一个），放那里同样有效。
+
+装好后对 Agent 说“给这个页面开批注”或“按批注改”即可。
 
 ## 30 秒试一下
 
@@ -162,6 +190,7 @@ node test/e2e.js          29 项，用真实鼠标键盘事件驱动本机 Chrom
 
 ## 更新记录
 
+- 0.2.3：没有代码变化。README 补 DSH 的安装方式，加一张操作动图。
 - 0.2.2：没有功能变化。“安全”一节写明防护的边界（硬链接或副本、同源、两条未实测）；修正 80 端口下对来源的判断。第三轮评审用自己的一份页面（表格、SVG、代码块、长页面）跑通，是第二个用户的第一次反馈。
 - 0.2.1：第二轮评审打穿了 0.2.0 的两处修复，这一版补上。隐藏文件：地址里用反斜杠、或经由一个名字正常的联接，仍能读到 `.env` 和隐藏文件夹；现在按解析后的真实路径判断，并拒绝带反斜杠或冒号的地址。空的批注文件：之前被当成“还没有批注”，下一次保存会覆盖它并毁掉 `.bak`；现在空文件按损坏处理。文件锁只在持有者确实不在时才被接管。`e2e.js` 加 `--require-browser`，并加了跨站写入的实测。
 - 0.2.0：改名为 static-html-comments（原名 page-comments，与已有项目重名）。加 MIT 许可证。重写定位和同类对比。写入加文件锁。新增浏览器端自动化测试。
@@ -180,5 +209,5 @@ LICENSE                     MIT
 demo/                       示例页（两页，内容是编的）
 test/selftest.js            服务端与命令行自测
 test/e2e.js                 浏览器端自测
-docs/                       截图、三轮评审的记录
+docs/                       动图、截图、三轮评审的记录
 ```
