@@ -1,0 +1,6 @@
+# comments made while trying the tool on the bundled demo
+.page-comments/
+# release artifacts are built from a tag, not kept in the tree
+MANIFEST.sha256
+*.zip
+node_modules/
