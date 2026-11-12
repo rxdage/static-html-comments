@@ -118,8 +118,17 @@ function write(list) {
   try { if (fs.statSync(file).size > 0) fs.copyFileSync(file, file + '.bak'); } catch (e) { }   // previous good copy: callers have just read and parsed it
   const tmp = `${file}.${process.pid}.${Date.now().toString(36)}.tmp`;   // unique, so two writers never share a temp file
   fs.writeFileSync(tmp, JSON.stringify({ version: 1, comments: list }, null, 2), 'utf8');
-  fs.renameSync(tmp, file);
-  fs.writeFileSync(digest, toMarkdown(list, false), 'utf8');
+  // On Windows a virus scanner or the search indexer may hold the file open for a moment, and the rename then fails
+  // with EPERM / EBUSY / EACCES. That is not an error worth losing a save over: wait briefly and try again.
+  for (let attempt = 0; ; attempt++) {
+    try { fs.renameSync(tmp, file); break; }
+    catch (e) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code) || attempt >= 40) { try { fs.unlinkSync(tmp); } catch (e2) { } throw e; }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  // comments.md is a convenience copy; the save has already succeeded, so a failure here must not undo that
+  try { fs.writeFileSync(digest, toMarkdown(list, false), 'utf8'); } catch (e) { }
 }
 function pick(list, id) {
   const hit = list.filter(c => !c.deleted && c.id.indexOf(id) === 0);
