@@ -157,6 +157,33 @@ async function main() {
   const healed = await until(`${UI}.querySelector('.st').classList.contains('ok')`, 12000);
   ok('once the file is restored the held comment is saved by itself', healed === true && comments().some(c => c.text === '文件坏着的时候写的'));
 
+  // 9a. the button on the right edge can be dragged up and down, and stays where it was left
+  await goto(BASE + '/');
+  if (await ev('__pageComments.on')) { await altC(); await sleep(200); }
+  const FAB = `${UI}.querySelector('.fab')`;
+  const f0 = await center(FAB);
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: f0.x, y: f0.y, button: 'none' });
+  await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: f0.x, y: f0.y, button: 'left', buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 6; i++) await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: f0.x, y: f0.y + i * 30, button: 'left', buttons: 1 });
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: f0.x, y: f0.y + 180, button: 'left', buttons: 0, clickCount: 1 });
+  await sleep(250);
+  const f1 = await center(FAB);
+  ok('dragging the button moves it down by the same distance', Math.abs((f1.y - f0.y) - 180) < 4, `moved ${Math.round(f1.y - f0.y)} px`);
+  ok('...and the drag does not open comment mode', await ev('__pageComments.on') === false);
+  await goto(BASE + '/');
+  const f2 = await center(FAB);
+  ok('the position is remembered after a reload', Math.abs(f2.y - f1.y) < 4, `before ${Math.round(f1.y)}, after ${Math.round(f2.y)}`);
+  await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: f2.x, y: f2.y, button: 'left', buttons: 1, clickCount: 1 });
+  for (let i = 1; i <= 10; i++) await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: f2.x, y: f2.y + i * 200, button: 'left', buttons: 1 });
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: f2.x, y: f2.y + 2000, button: 'left', buttons: 0, clickCount: 1 });
+  await sleep(200);
+  const f3 = await center(FAB);
+  ok('it cannot be dragged off the window', f3.bottom <= (await ev('innerHeight')) && f3.top >= 0, `top ${Math.round(f3.top)}, bottom ${Math.round(f3.bottom)}`);
+  await click(f3.x, f3.y); await sleep(250);
+  ok('a plain click on it still opens comment mode', await ev('__pageComments.on') === true);
+  await altC(); await sleep(200);
+  await ev("Object.keys(localStorage).filter(k => k.endsWith(':button')).forEach(k => localStorage.removeItem(k))");
+
   // 9b. a different shortcut letter (--key alt+a)
   const KP = PORT + 100;
   const keySrv = spawn(process.execPath, [tool, site, '--port', String(KP), '--no-open', '--lang', 'zh', '--key', 'alt+a'], { stdio: 'ignore' });

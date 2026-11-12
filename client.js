@@ -18,7 +18,7 @@
     ph: '这里想怎么改？回车保存，Shift+回车换行', save: '保存', cancel: '取消', del: '删除', done: '标为已处理', reopen: '重新打开',
     listTitle: '全部批注', clear: '清掉已处理的', fold: '收起', empty: '还没有批注。点页面上想改的地方，写一句话，回车。',
     whole: '整页', blank: '空白处', at: '批在', lost: '原位置找不到了', copied: n => `已复制 ${n} 条，贴到对话里即可`, none: '没有未处理的批注',
-    cleared: n => `清掉了 ${n} 条已处理的`, noDone: '没有已处理的批注', emptyText: '内容是空的；不要这条就点“删除”', reply: '回复', key: KEY_LABEL,
+    cleared: n => `清掉了 ${n} 条已处理的`, noDone: '没有已处理的批注', emptyText: '内容是空的；不要这条就点“删除”', reply: '回复', key: KEY_LABEL, fabTip: KEY_LABEL + ' · 可上下拖动',
     exportHead: n => `网页批注（未处理 ${n} 条）`, img: '[图]'
   } : {
     fab: 'Comment', mode: 'Commenting · click anywhere', here: 'This page', all: 'All', open: 'open', page: 'Page note', list: 'List', copy: 'Copy all', exit: 'Exit',
@@ -26,7 +26,7 @@
     ph: 'What should change here? Enter to save, Shift+Enter for a new line', save: 'Save', cancel: 'Cancel', del: 'Delete', done: 'Resolve', reopen: 'Reopen',
     listTitle: 'All comments', clear: 'Clear resolved', fold: 'Close', empty: 'No comments yet. Click the spot you want changed, type a sentence, press Enter.',
     whole: 'Whole page', blank: 'blank area', at: 'On', lost: 'anchor not found', copied: n => `Copied ${n} comment(s). Paste them into the chat`, none: 'No open comments',
-    cleared: n => `Cleared ${n} resolved`, noDone: 'Nothing resolved yet', emptyText: 'Empty text. Use Delete to remove this comment', reply: 'Reply', key: KEY_LABEL,
+    cleared: n => `Cleared ${n} resolved`, noDone: 'Nothing resolved yet', emptyText: 'Empty text. Use Delete to remove this comment', reply: 'Reply', key: KEY_LABEL, fabTip: KEY_LABEL + ' · drag to move up or down',
     exportHead: n => `Page comments (${n} open)`, img: '[image]'
   };
 
@@ -101,9 +101,10 @@
   .pin.new { animation: pulse 1s ease infinite; } .pin.flash { animation: pulse .5s ease 4; }
   @keyframes pulse { 50% { box-shadow: 0 2px 10px rgba(0,0,0,.45), 0 0 0 10px rgba(224,69,123,.35); } }
   .panel { position: fixed; color: #ECEEF1; background: #171B21; border: 1px solid #3A4552; border-radius: 6px; box-shadow: 0 10px 36px rgba(0,0,0,.4); font-size: 13.5px; line-height: 1.5; }
-  .fab { right: 0; top: 50%; transform: translateY(-50%); border-right: 0; border-radius: 6px 0 0 6px; padding: 8px 9px 8px 11px; cursor: pointer; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .fab { right: 0; top: 50%; transform: translateY(-50%); border-right: 0; border-radius: 6px 0 0 6px; padding: 8px 9px 8px 11px; cursor: pointer; touch-action: none; user-select: none; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
   .fab:hover { background: #222831; } .fab .dot, .bar .dot { width: 9px; height: 9px; border-radius: 50%; background: #E0457B; flex: none; }
   .fab b { font-weight: 600; } .fab small { color: #8A94A1; font-size: 11.5px; }
+  .fab.dragging { cursor: grabbing; background: #222831; }
   .on .fab { display: none; }
   .bar { top: 8px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 10px; padding: 6px 8px 6px 14px; white-space: nowrap; max-width: calc(100vw - 16px); }
   .on .bar { display: flex; }
@@ -133,7 +134,7 @@
   </style>
   <div class="wrap">
     <div class="pins"></div>
-    <div class="panel fab" title="${T.key}"><span class="dot"></span><b>${T.fab}</b><span class="n"></span><small>${T.key}</small></div>
+    <div class="panel fab" title="${T.fabTip}"><span class="dot"></span><b>${T.fab}</b><span class="n"></span><small>${T.key}</small></div>
     <div class="panel bar"><span class="dot"></span><span>${T.mode}</span><span class="cnt"></span>
       <button class="b" data-a="page">${T.page}</button><button class="b" data-a="list">${T.list}</button><button class="b" data-a="copy">${T.copy}</button><button class="b" data-a="off">${T.exit}</button><span class="st"></span></div>
     <div class="panel list"><div class="hd"><b>${T.listTitle}</b><button class="b" data-a="clear">${T.clear}</button><button class="b" data-a="list">${T.fold}</button></div><div class="sc"></div></div>
@@ -335,7 +336,36 @@
   addEventListener('keydown', e => { if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === KEY_CODE) { e.preventDefault(); e.stopImmediatePropagation(); toggle(); } }, true);
   // typing in our box must not trigger the page's keyboard shortcuts
   ['keydown', 'keyup', 'keypress'].forEach(t => host.addEventListener(t, e => e.stopPropagation()));
-  fab.addEventListener('click', () => toggle(true));
+  // The button sits on the right edge and can be dragged up or down, out of the way of whatever the page has there.
+  // Its position is kept as a fraction of the window height, so it survives reloads and window resizes.
+  const FAB_KEY = LS + ':button';
+  let fabAt = 0.5, fabDrag = null, fabMoved = false;
+  function placeFab() {
+    const half = (fab.offsetHeight || 36) / 2, y = Math.max(half + 6, Math.min(innerHeight - half - 6, fabAt * innerHeight));
+    fab.style.top = y + 'px';
+  }
+  try { const v = parseFloat(localStorage.getItem(FAB_KEY)); if (v >= 0 && v <= 1) fabAt = v; } catch (e) { }
+  fab.addEventListener('pointerdown', e => {
+    if (e.button) return;
+    fabDrag = { y: e.clientY, top: fab.getBoundingClientRect().top + fab.offsetHeight / 2 }; fabMoved = false;
+    try { fab.setPointerCapture(e.pointerId); } catch (x) { }
+  });
+  fab.addEventListener('pointermove', e => {
+    if (!fabDrag) return;
+    const dy = e.clientY - fabDrag.y;
+    if (!fabMoved && Math.abs(dy) < 5) return;                     // a small wobble while clicking is still a click
+    fabMoved = true; fab.classList.add('dragging');
+    fabAt = (fabDrag.top + dy) / innerHeight; placeFab();
+  });
+  const fabDrop = e => {
+    if (!fabDrag) return;
+    fabDrag = null; fab.classList.remove('dragging');
+    try { fab.releasePointerCapture(e.pointerId); } catch (x) { }
+    if (fabMoved) { fabAt = (fab.getBoundingClientRect().top + fab.offsetHeight / 2) / innerHeight; try { localStorage.setItem(FAB_KEY, fabAt.toFixed(4)); } catch (x) { } }
+  };
+  fab.addEventListener('pointerup', fabDrop); fab.addEventListener('pointercancel', fabDrop);
+  fab.addEventListener('click', () => { if (fabMoved) { fabMoved = false; return; } toggle(true); });   // the click that ends a drag does not open comment mode
+  addEventListener('resize', placeFab);
   pinBox.addEventListener('click', e => {
     const pin = e.target.closest('.pin'); if (!pin || !pin._c) return;
     const r = pin.getBoundingClientRect(); openEditor(pin._c, false, r.left, r.bottom);   // the pin's sharp corner sits on the clicked point
@@ -378,7 +408,7 @@
 
   /* ---------- start ---------- */
   function start() {
-    mount();
+    mount(); placeFab();
     render();
     let want = /[?&]pc=1\b/.test(location.search), jumpId = '';
     try { want = want || sessionStorage.getItem('page-comments-on') === '1'; jumpId = sessionStorage.getItem('page-comments-jump') || ''; sessionStorage.removeItem('page-comments-jump'); } catch (e) { }
