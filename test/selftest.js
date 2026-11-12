@@ -163,6 +163,17 @@ const cli = (...a) => spawnSync(process.execPath, [tool, ...a], { encoding: 'utf
     ok('no temp files are left behind', fs.readdirSync(store).filter(n => n.endsWith('.tmp')).length === 0, fs.readdirSync(store).join(' '));
     out = cli('list', tmp, '--out', 'elsewhere');
     ok('the removed --out option is rejected instead of silently reading nothing', out.status !== 0 && /unknown option --out/.test(out.stderr));
+    // --key: another letter for the comment-mode shortcut
+    const KP = PORT + 1;
+    const keySrv = spawn(process.execPath, [tool, tmp, '--port', String(KP), '--no-open', '--key', 'alt+a'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let keyLog = ''; keySrv.stdout.on('data', d => keyLog += d);
+    for (let i = 0; i < 50 && !/http:/.test(keyLog); i++) await new Promise(r2 => setTimeout(r2, 100));
+    const keyPage = await new Promise((res, rej) => http.get({ host: '127.0.0.1', port: KP, path: '/' }, x => { let b = ''; x.on('data', d => b += d); x.on('end', () => res(b)); }).on('error', rej));
+    keySrv.kill();
+    ok('--key alt+a is passed to the page and announced', /<script src="\/__pc__\/client\.js" data-key="a"><\/script>/.test(keyPage) && /Alt\+A toggles/.test(keyLog), keyLog);
+    ok('the default shortcut adds nothing to the injected tag', (await req('GET', '/')).buf.toString().includes('<script src="/__pc__/client.js"></script>'));
+    out = cli(tmp, '--no-open', '--key', 'ctrl+shift+x');
+    ok('an unusable --key is rejected', out.status === 1 && /--key takes Alt plus one letter/.test(out.stderr), out.stderr);
     out = cli('--help');
     ok('--help prints usage only', out.status === 0 && out.stdout.includes('resolve <dir>') && !out.stdout.includes('use strict'));
 

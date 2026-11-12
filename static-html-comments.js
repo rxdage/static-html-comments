@@ -2,7 +2,7 @@
 // static-html-comments: comment on a local web page while you look at it; the comments land in a file an agent can read.
 // No dependencies. Node 16+.
 //
-//   node static-html-comments.js <dir | file.html> [--port 8790] [--no-open] [--lang zh|en]
+//   node static-html-comments.js <dir | file.html> [--port 8790] [--no-open] [--lang zh|en] [--key alt+c]
 //   node static-html-comments.js list    <dir> [--all] [--json]
 //   node static-html-comments.js resolve <dir> <id> "<reply>"
 //   node static-html-comments.js reopen  <dir> <id>
@@ -23,7 +23,7 @@ for (let i = 0; i < argv.length; i++) {
   if (a === '--no-open') flags.noOpen = true;
   else if (a === '--all') flags.all = true;
   else if (a === '--json') flags.json = true;
-  else if (a === '--port' || a === '--lang') flags[a.slice(2)] = argv[++i];
+  else if (a === '--port' || a === '--lang' || a === '--key') flags[a.slice(2)] = argv[++i];
   else if (a === '-h' || a === '--help') flags.help = true;
   else if (a.startsWith('--')) { console.error('unknown option ' + a + ' (see --help)'); process.exit(1); }
   else pos.push(a);
@@ -169,7 +169,12 @@ function resolveInside(abs) {
 }
 const ROOT_ID = require('crypto').createHash('sha1').update(store).digest('hex').slice(0, 12);   // lets the page tell two sites on the same port apart
 const lang = flags.lang ? ` data-lang="${String(flags.lang).replace(/[^a-zA-Z-]/g, '')}"` : '';
-const TAG = Buffer.from(`<script src="${PREFIX}client.js"${lang}></script>`);
+// --key alt+a: which letter toggles comment mode together with Alt (default c), for pages or browsers where Alt+C is taken
+const keyArg = String(flags.key == null ? 'alt+c' : flags.key).toLowerCase().replace(/\s+/g, '');
+const keyMatch = /^(?:alt\+)?([a-z])$/.exec(keyArg);
+if (!keyMatch) { console.error('--key takes Alt plus one letter, for example: --key alt+a'); process.exit(1); }
+const KEY = keyMatch[1];
+const TAG = Buffer.from(`<script src="${PREFIX}client.js"${lang}${KEY === 'c' ? '' : ` data-key="${KEY}"`}></script>`);
 let port = +(flags.port || 8790);
 
 function send(res, code, body, type) { res.writeHead(code, { 'Content-Type': type || 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(body); }
@@ -267,7 +272,7 @@ server.on('listening', () => {
   console.log(`serving               ${root}`);
   console.log(`comments file         ${file}`);
   try { read(); } catch (e) { console.error('\nWARNING: ' + e.message + '\nThe page will open, but comments cannot be loaded or saved until this is fixed.\n'); }
-  console.log('Alt+C toggles comment mode. Ctrl+C here (or close this window) to stop.');
+  console.log(`Alt+${KEY.toUpperCase()} toggles comment mode. Ctrl+C here (or close this window) to stop.`);
   if (!flags.noOpen) exec(process.platform === 'win32' ? `start "" "${url}"` : process.platform === 'darwin' ? `open "${url}"` : `xdg-open "${url}"`, () => { });
 });
 server.listen(port, '127.0.0.1');

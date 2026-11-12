@@ -9,13 +9,16 @@
   const API = BASE + 'api/comments';
   const lang = ((script && script.dataset.lang) || navigator.language || 'en').toLowerCase();
   const ZH = lang.indexOf('zh') === 0;
+  // the letter that, with Alt, toggles comment mode; the server passes it when started with --key
+  const KEY = (((script && script.dataset.key) || 'c').toLowerCase().match(/[a-z]/) || ['c'])[0];
+  const KEY_CODE = 'Key' + KEY.toUpperCase(), KEY_LABEL = 'Alt+' + KEY.toUpperCase();
   const T = ZH ? {
     fab: '批注', mode: '批注中 · 点哪批哪', here: '本页', all: '全部', open: '条未处理', page: '整页意见', list: '列表', copy: '复制全部', exit: '退出',
     saved: '已存盘', unsaved: '未连接', broken: '批注文件损坏', brokenTip: '.page-comments/comments.json 读不出来，服务没有动它。修好、用旁边的 .bak 恢复、或者把它挪走之后会自动恢复；这期间新写的批注暂存在这个浏览器里', savedTip: '每条批注都自动存进 .page-comments/comments.json', unsavedTip: '连不上本地服务。这期间新写的批注暂存在这个浏览器里，服务恢复后会自动补存',
     ph: '这里想怎么改？回车保存，Shift+回车换行', save: '保存', cancel: '取消', del: '删除', done: '标为已处理', reopen: '重新打开',
     listTitle: '全部批注', clear: '清掉已处理的', fold: '收起', empty: '还没有批注。点页面上想改的地方，写一句话，回车。',
     whole: '整页', blank: '空白处', at: '批在', lost: '原位置找不到了', copied: n => `已复制 ${n} 条，贴到对话里即可`, none: '没有未处理的批注',
-    cleared: n => `清掉了 ${n} 条已处理的`, noDone: '没有已处理的批注', emptyText: '内容是空的；不要这条就点“删除”', reply: '回复', key: 'Alt+C',
+    cleared: n => `清掉了 ${n} 条已处理的`, noDone: '没有已处理的批注', emptyText: '内容是空的；不要这条就点“删除”', reply: '回复', key: KEY_LABEL,
     exportHead: n => `网页批注（未处理 ${n} 条）`, img: '[图]'
   } : {
     fab: 'Comment', mode: 'Commenting · click anywhere', here: 'This page', all: 'All', open: 'open', page: 'Page note', list: 'List', copy: 'Copy all', exit: 'Exit',
@@ -23,7 +26,7 @@
     ph: 'What should change here? Enter to save, Shift+Enter for a new line', save: 'Save', cancel: 'Cancel', del: 'Delete', done: 'Resolve', reopen: 'Reopen',
     listTitle: 'All comments', clear: 'Clear resolved', fold: 'Close', empty: 'No comments yet. Click the spot you want changed, type a sentence, press Enter.',
     whole: 'Whole page', blank: 'blank area', at: 'On', lost: 'anchor not found', copied: n => `Copied ${n} comment(s). Paste them into the chat`, none: 'No open comments',
-    cleared: n => `Cleared ${n} resolved`, noDone: 'Nothing resolved yet', emptyText: 'Empty text. Use Delete to remove this comment', reply: 'Reply', key: 'Alt+C',
+    cleared: n => `Cleared ${n} resolved`, noDone: 'Nothing resolved yet', emptyText: 'Empty text. Use Delete to remove this comment', reply: 'Reply', key: KEY_LABEL,
     exportHead: n => `Page comments (${n} open)`, img: '[image]'
   };
 
@@ -329,7 +332,7 @@
     const el = e.target && e.target.nodeType === 1 ? e.target : (e.target && e.target.parentElement);
     newAt(el, e.clientX, e.clientY);
   }, true);
-  addEventListener('keydown', e => { if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyC') { e.preventDefault(); e.stopImmediatePropagation(); toggle(); } }, true);
+  addEventListener('keydown', e => { if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === KEY_CODE) { e.preventDefault(); e.stopImmediatePropagation(); toggle(); } }, true);
   // typing in our box must not trigger the page's keyboard shortcuts
   ['keydown', 'keyup', 'keypress'].forEach(t => host.addEventListener(t, e => e.stopPropagation()));
   fab.addEventListener('click', () => toggle(true));

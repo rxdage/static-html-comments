@@ -157,6 +157,19 @@ async function main() {
   const healed = await until(`${UI}.querySelector('.st').classList.contains('ok')`, 12000);
   ok('once the file is restored the held comment is saved by itself', healed === true && comments().some(c => c.text === '文件坏着的时候写的'));
 
+  // 9b. a different shortcut letter (--key alt+a)
+  const KP = PORT + 100;
+  const keySrv = spawn(process.execPath, [tool, site, '--port', String(KP), '--no-open', '--lang', 'zh', '--key', 'alt+a'], { stdio: 'ignore' });
+  await sleep(900);
+  await cdp('Page.navigate', { url: `http://127.0.0.1:${KP}/` }); await until("document.readyState === 'complete' && !!window.__pageComments", 8000); await sleep(400);
+  const before2 = await ev('__pageComments.on');
+  await altC(); await sleep(250); const afterC = await ev('__pageComments.on');
+  await key('a', 'KeyA', 65, 1); await sleep(250); const afterA = await ev('__pageComments.on');
+  ok('with --key alt+a, Alt+A toggles comment mode and Alt+C no longer does', afterC === before2 && afterA === !before2, `start ${before2}, after Alt+C ${afterC}, after Alt+A ${afterA}`);
+  ok('...and the button on the page shows the new shortcut', await ev(`${UI}.querySelector('.fab small').textContent`) === 'Alt+A');
+  if (afterA) { await key('a', 'KeyA', 65, 1); await sleep(150); }
+  keySrv.kill();
+
   // 10. another web site open in the same browser cannot write comments
   const evil = http.createServer((q, s) => { s.writeHead(200, { 'Content-Type': 'text/html' }); s.end('<!doctype html><title>other site</title><body>other</body>'); });
   await new Promise(r => evil.listen(0, '127.0.0.1', r));
